@@ -49,7 +49,11 @@ applies Kustomizations. Nothing listens for webhooks, so nothing in the cluster 
 | Label | `reconcile.fluxcd.io/watch: Enabled`, so a change applies immediately, not at the next 1-minute interval |
 
 A process on the cluster host writes this ConfigMap from the host's own configuration; this repo
-never knows where the values come from. Example:
+never knows where the values come from. It derives each key from a parameter name:
+
+**Key rule.** Take the parameter name, strip everything up to and including `targets/`, replace every `/`, `-` and `.` with `_`, uppercase the result, and prefix `TARGET_`: `targets/online-boutique` becomes `TARGET_ONLINE_BOUTIQUE`, and `targets/online-boutique/loadgen_replicas` becomes `TARGET_ONLINE_BOUTIQUE_LOADGEN_REPLICAS`.
+
+Example:
 
 ```yaml
 apiVersion: v1
