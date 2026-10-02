@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - gotk-components.yaml
+  - gotk-sync.yaml
+patches:
+  # Reconcile a Kustomization as soon as a ConfigMap it substitutes from changes,
+  # instead of waiting for its interval. In Flux v2.9.6 this selector is the
+  # controller's default; it is set here so the behaviour is pinned in the repo.
+  # The ConfigMap must carry the label  reconcile.fluxcd.io/watch: Enabled
+  - target:
+      kind: Deployment
+      name: kustomize-controller
+    patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --watch-configs-label-selector=reconcile.fluxcd.io/watch=Enabled

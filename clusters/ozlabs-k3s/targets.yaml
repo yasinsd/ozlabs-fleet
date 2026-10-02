@@ -1,0 +1,21 @@
+# Builds ./targets: one switch Kustomization per target. Switch values come from
+# the ozlabs-targets ConfigMap; if it is absent, every target is off.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: targets
+  namespace: flux-system
+spec:
+  interval: 1m
+  dependsOn:
+    - name: flux-system
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./targets
+  prune: true
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: ozlabs-targets
+        optional: true

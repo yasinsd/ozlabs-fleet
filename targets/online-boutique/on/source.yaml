@@ -1,0 +1,11 @@
+# The application source, pinned to one commit (v0.10.7 manifests).
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: online-boutique
+  namespace: flux-system
+spec:
+  interval: 10m
+  url: https://github.com/yasinsd/microservices-demo
+  ref:
+    commit: 0f33930e4ec31095a69c4c24e22945ed268405f5

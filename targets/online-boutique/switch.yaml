@@ -1,0 +1,20 @@
+# Switch for the online-boutique target: TARGET_ONLINE_BOUTIQUE = on | off
+# (absent = off). The path selects ./on or ./off; prune removes everything the
+# target created when it is switched off.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: online-boutique
+  namespace: flux-system
+spec:
+  interval: 1m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./targets/online-boutique/${TARGET_ONLINE_BOUTIQUE:=off}
+  prune: true
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: ozlabs-targets
+        optional: true
