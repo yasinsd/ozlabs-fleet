@@ -15,6 +15,7 @@ spec:
   path: ./targets
   prune: true
   postBuild:
+    substituteStrategy: Always
     substituteFrom:
       - kind: ConfigMap
         name: ozlabs-targets
