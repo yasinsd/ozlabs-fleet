@@ -1,0 +1,8 @@
+# The Wiz integration's namespace. Its three Secrets (wiz-api-token,
+# sensor-image-pull, wiz-env) are not in Git: the operator applies them from the
+# lab's Parameter Store, and from the October 11 rebuild the node timer does.
+# Pruning this namespace deletes them too.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: wiz

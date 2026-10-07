@@ -1,11 +1,12 @@
 # ozlabs-fleet
 
 The GitOps repository for the OzLabs lab cluster: a single-node K3s cluster reconciled by
-[Flux](https://fluxcd.io). The baseline cluster runs Flux and nothing else. Every workload is an
-**opt-in target**, switched on or off by one key in a ConfigMap.
+[Flux](https://fluxcd.io). The baseline cluster runs Flux and an always-on **platform** layer (`platform/`).
+Every workload is an **opt-in target**, switched on or off by one key in a ConfigMap.
 
 **No secrets in this repo, ever.** It is public, the cluster reads it without credentials, and
-nothing in it may need one: no tokens, keys, passwords or private URLs.
+nothing in it may need one: no tokens, keys, passwords or private URLs. A platform component that needs
+a secret or a per-lab value names an in-cluster Secret that is created from outside the repository.
 
 ## Layout
 
@@ -15,8 +16,12 @@ clusters/ozlabs-k3s/
     gotk-components.yaml   Flux controllers (exported, committed unchanged)
     gotk-sync.yaml         GitRepository + Kustomization "flux-system" for this repo
     kustomization.yaml     both files + the kustomize-controller patch (below)
-  kustomization.yaml       flux-system + targets.yaml
+  kustomization.yaml       flux-system + platform.yaml + targets.yaml
+  platform.yaml            Kustomization "platform": builds ./platform (no switch, no substitution)
   targets.yaml             Kustomization "targets": builds ./targets with the switch values
+platform/
+  kustomization.yaml       one line per platform component
+  wiz/                     namespace, HelmRepository and the Wiz HelmRelease (suspended)
 targets/
   kustomization.yaml       one line per target switch
   online-boutique/
@@ -33,10 +38,21 @@ VERSION                    pinned Flux version
 | Flux | **v2.9.6** (`VERSION`) |
 | source-controller | v1.9.6 |
 | kustomize-controller | v1.9.6 |
+| helm-controller | v1.6.5 |
+| Wiz chart `wiz-kubernetes-integration` | 0.3.79 (bundles connector 4.0.7, broker 3.0.4, admission controller 4.0.3, sensor 1.0.12603) |
 
-Only `source-controller` and `kustomize-controller` are installed: Flux pulls from public Git and
-applies Kustomizations. Nothing listens for webhooks, so nothing in the cluster needs inbound access.
-`helm-controller`, if a target ever needs it, is added by a commit here.
+`source-controller`, `kustomize-controller` and `helm-controller` are installed. Flux pulls from public
+Git and from public Helm repositories, and applies Kustomizations and HelmReleases. Nothing listens for
+webhooks, so nothing in the cluster needs inbound access.
+
+**Platform: Wiz.** `platform/wiz/helmrelease.yaml` holds the Wiz Kubernetes integration in its full
+intended shape: connector with broker, Runtime Sensor and Admission Controller, every component disabled
+and the release suspended. Nothing in it reconciles until a later change enables a component and lifts
+`spec.suspend`. Its per-lab values come from in-cluster Secrets in namespace `wiz`, never from this repo:
+- `wiz-api-token` (keys `clientId`, `clientToken`);
+- `sensor-image-pull` (`kubernetes.io/dockerconfigjson`);
+- `wiz-env`, read through `valuesFrom`: `SUBSCRIPTION_EXTERNAL_ID` → `global.subscriptionExternalId`, and
+  `CLUSTER_DISPLAY_NAME` → `global.clusterDisplayName`.
 
 ## Target switches: the `ozlabs-targets` ConfigMap
 
@@ -102,7 +118,7 @@ kubectl wait --for=condition=Established --timeout=2m \
 kubectl apply -f https://raw.githubusercontent.com/yasinsd/ozlabs-fleet/<FLEET_COMMIT_SHA>/clusters/ozlabs-k3s/flux-system/gotk-sync.yaml
 ```
 
-The first file creates the `flux-system` namespace, the CRDs and the two controllers. The `wait` lets
+The first file creates the `flux-system` namespace, the CRDs and the three controllers. The `wait` lets
 the CRDs register before the second file creates the `flux-system` GitRepository and Kustomization.
 From then on, Flux reconciles `./clusters/ozlabs-k3s` from `main`, including its own manifests: the
 kustomize-controller patch is applied by that first reconcile. The cluster then runs `targets`, with
@@ -123,18 +139,20 @@ every target off until the ConfigMap switches one on.
 ## Change a pin
 
 - **Flux:** with the flux CLI at the new version, run
-  `flux install --export --components=source-controller,kustomize-controller --version=<version>`,
+  `flux install --export --components=source-controller,kustomize-controller,helm-controller --version=<version>`,
   replace `gotk-components.yaml` with the output unchanged, and update `VERSION` and the table above.
   Re-check the flag and label under *Reconcile on change* for that version. Running clusters upgrade
   from `main`; new clusters install from whatever commit cloud-init pins.
 - **An application:** change `ref.commit` (full SHA) in the target's `on/source.yaml`.
+- **A platform chart:** change `spec.chart.spec.version` in the component's `helmrelease.yaml` and the table
+  above. Render it with `helm template` against the new version before committing.
 - **The install commit:** the `<FLEET_COMMIT_SHA>` in cloud-init. It only decides which Flux version
   a new cluster starts from; the cluster follows `main` afterwards.
 
 ## Validate
 
 ```sh
-kubectl kustomize clusters/ozlabs-k3s            # and flux-system, targets, targets/*/on, targets/*/off
+kubectl kustomize clusters/ozlabs-k3s            # and flux-system, platform, targets, targets/*/on, targets/*/off
 
 # Render the app the way kustomize-controller does (components + patches). Substitute the
 # sub-keys first, as the switch Kustomization does in the cluster:

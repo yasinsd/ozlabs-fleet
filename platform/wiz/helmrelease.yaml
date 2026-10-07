@@ -1,0 +1,92 @@
+# The Wiz Kubernetes integration (umbrella chart), committed in its full intended
+# shape with every component off and the release suspended. Later phases switch
+# one component on at a time and lift the suspension.
+#
+# Pinned: wiz-kubernetes-integration 0.3.79. The chart package bundles its
+# subcharts: wiz-kubernetes-connector 4.0.7 (wiz-broker 3.0.4),
+# wiz-admission-controller 4.0.3 and wiz-sensor 1.0.12603. The sensor image
+# comes from the sensor chart's image.registry default, wizio.azurecr.io.
+#
+# No per-lab value is committed. Two come from the in-cluster Secret wiz-env
+# (namespace wiz) through valuesFrom:
+#   SUBSCRIPTION_EXTERNAL_ID → global.subscriptionExternalId. Pods cannot read
+#                              instance metadata on this node.
+#   CLUSTER_DISPLAY_NAME     → global.clusterDisplayName. It names the connector
+#                              the chart's job creates, the sensor deployment and
+#                              the admission controller in the Wiz tenant.
+# The API token comes from the in-cluster Secret wiz-api-token (keys clientId,
+# clientToken); the sensor image pull secret is sensor-image-pull.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: wiz-kubernetes-integration
+  namespace: wiz
+spec:
+  suspend: true
+  interval: 30m
+  chart:
+    spec:
+      chart: wiz-kubernetes-integration
+      version: "0.3.79"
+      sourceRef:
+        kind: HelmRepository
+        name: wiz-sec
+      interval: 12h
+  valuesFrom:
+    - kind: Secret
+      name: wiz-env
+      valuesKey: SUBSCRIPTION_EXTERNAL_ID
+      targetPath: global.subscriptionExternalId
+    - kind: Secret
+      name: wiz-env
+      valuesKey: CLUSTER_DISPLAY_NAME
+      targetPath: global.clusterDisplayName
+  values:
+    global:
+      wizApiToken:
+        secret:
+          create: false
+          name: wiz-api-token
+
+    # Connector and broker. The chart's job creates the Kubernetes connector
+    # (autoCreateConnector) and deletes it on uninstall.
+    wiz-kubernetes-connector:
+      enabled: false
+      autoCreateConnector:
+        enabled: true
+        clusterFlavor: Kubernetes
+        autoDeleteConnectorEnabled: true
+      wiz-broker:
+        enabled: true
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+
+    # Runtime Sensor. K3s serves the CRI socket at a non-standard path. The pull
+    # secret is pre-created, so the chart does not create one. Resources: the
+    # chart's defaults.
+    wiz-sensor:
+      enabled: false
+      imagePullSecret:
+        required: true
+        create: false
+        name: sensor-image-pull
+      daemonset:
+        criSocketPath: /run/k3s/containerd/containerd.sock
+
+    # Admission Controller: one replica on the single node. No cert-manager in
+    # this phase; the chart issues its own webhook certificate.
+    wiz-admission-controller:
+      enabled: false
+      replicaCount: 1
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi

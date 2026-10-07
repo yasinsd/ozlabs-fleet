@@ -1,0 +1,19 @@
+# Builds ./platform: always-on platform components, outside the target switches.
+# There is no switch and no substitution. Each component is pinned in Git, and a
+# component that must not run yet is suspended in its own manifest (the Wiz
+# HelmRelease, spec.suspend). No health check: a suspended release never reports
+# Ready, and the existing Kustomizations set none either.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: platform
+  namespace: flux-system
+spec:
+  interval: 10m
+  dependsOn:
+    - name: flux-system
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./platform
+  prune: true
