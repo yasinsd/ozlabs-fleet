@@ -1,6 +1,6 @@
 # The Wiz Kubernetes integration (umbrella chart), committed in its full intended
-# shape with every component off and the release suspended. Later phases switch
-# one component on at a time and lift the suspension.
+# shape. Components are switched on one at a time: the connector with its broker
+# is on; the Runtime Sensor and the Admission Controller are still off.
 #
 # Pinned: wiz-kubernetes-integration 0.3.79. The chart package bundles its
 # subcharts: wiz-kubernetes-connector 4.0.7 (wiz-broker 3.0.4),
@@ -22,8 +22,12 @@ metadata:
   name: wiz-kubernetes-integration
   namespace: wiz
 spec:
-  suspend: true
+  suspend: false
   interval: 30m
+  # Helm's timeout also bounds the hook Jobs. The connector's create Job waits
+  # until the new connector is initialized (--wait, with the broker), and a first
+  # install is expected to take 5-10 min; Flux's default is 5 min.
+  timeout: 15m
   chart:
     spec:
       chart: wiz-kubernetes-integration
@@ -51,7 +55,7 @@ spec:
     # Connector and broker. The chart's job creates the Kubernetes connector
     # (autoCreateConnector) and deletes it on uninstall.
     wiz-kubernetes-connector:
-      enabled: false
+      enabled: true
       autoCreateConnector:
         enabled: true
         clusterFlavor: Kubernetes
