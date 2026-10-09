@@ -21,7 +21,7 @@ clusters/ozlabs-k3s/
   targets.yaml             Kustomization "targets": builds ./targets with the switch values
 platform/
   kustomization.yaml       one line per platform component
-  wiz/                     namespace, HelmRepository and the Wiz HelmRelease (suspended)
+  wiz/                     namespace, HelmRepository and the Wiz HelmRelease (connector and broker on)
 targets/
   kustomization.yaml       one line per target switch
   online-boutique/
@@ -46,9 +46,15 @@ Git and from public Helm repositories, and applies Kustomizations and HelmReleas
 webhooks, so nothing in the cluster needs inbound access.
 
 **Platform: Wiz.** `platform/wiz/helmrelease.yaml` holds the Wiz Kubernetes integration in its full
-intended shape: connector with broker, Runtime Sensor and Admission Controller, every component disabled
-and the release suspended. Nothing in it reconciles until a later change enables a component and lifts
-`spec.suspend`. Its per-lab values come from in-cluster Secrets in namespace `wiz`, never from this repo:
+intended shape: connector with broker, Runtime Sensor and Admission Controller. Components are switched on one
+at a time.
+- **On:** the connector and its broker. The chart's job creates the Kubernetes connector at install and deletes it on
+  uninstall.
+- **Still disabled:** the Runtime Sensor and the Admission Controller.
+- **Broker restarts.** The broker chart puts a random `rollme` annotation on its pod template at every render, so
+  the broker restarts on every Helm upgrade (a new chart version or new values), not on every Flux interval.
+
+Its per-lab values come from in-cluster Secrets in namespace `wiz`, never from this repo:
 - `wiz-api-token` (keys `clientId`, `clientToken`);
 - `sensor-image-pull` (`kubernetes.io/dockerconfigjson`);
 - `wiz-env`, read through `valuesFrom`: `SUBSCRIPTION_EXTERNAL_ID` → `global.subscriptionExternalId`, and

@@ -25,8 +25,9 @@ spec:
   suspend: false
   interval: 30m
   # Helm's timeout also bounds the hook Jobs. The connector's create Job waits
-  # until the new connector is initialized (--wait, with the broker), and a first
-  # install is expected to take 5-10 min; Flux's default is 5 min.
+  # until the new connector is initialized (--wait, with the broker). The first
+  # install took about 1.5 min (one observation, 2026-10-09); 15m leaves room over
+  # Flux's 5 min default.
   timeout: 15m
   chart:
     spec:
