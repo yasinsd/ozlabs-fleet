@@ -1,6 +1,6 @@
 # The Wiz Kubernetes integration (umbrella chart), committed in its full intended
 # shape. Components are switched on one at a time: the connector with its broker
-# is on; the Runtime Sensor and the Admission Controller are still off.
+# and the Runtime Sensor are on; the Admission Controller is still off.
 #
 # Pinned: wiz-kubernetes-integration 0.3.79. The chart package bundles its
 # subcharts: wiz-kubernetes-connector 4.0.7 (wiz-broker 3.0.4),
@@ -75,7 +75,7 @@ spec:
     # secret is pre-created, so the chart does not create one. Resources: the
     # chart's defaults.
     wiz-sensor:
-      enabled: false
+      enabled: true
       imagePullSecret:
         required: true
         create: false

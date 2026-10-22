@@ -21,7 +21,7 @@ clusters/ozlabs-k3s/
   targets.yaml             Kustomization "targets": builds ./targets with the switch values
 platform/
   kustomization.yaml       one line per platform component
-  wiz/                     namespace, HelmRepository and the Wiz HelmRelease (connector and broker on)
+  wiz/                     namespace, HelmRepository and the Wiz HelmRelease (connector, broker and sensor on)
 targets/
   kustomization.yaml       one line per target switch
   online-boutique/
@@ -48,9 +48,9 @@ webhooks, so nothing in the cluster needs inbound access.
 **Platform: Wiz.** `platform/wiz/helmrelease.yaml` holds the Wiz Kubernetes integration in its full
 intended shape: connector with broker, Runtime Sensor and Admission Controller. Components are switched on one
 at a time.
-- **On:** the connector and its broker. The chart's job creates the Kubernetes connector at install and deletes it on
-  uninstall.
-- **Still disabled:** the Runtime Sensor and the Admission Controller.
+- **On:** the connector and its broker, and the Runtime Sensor (a DaemonSet). The chart's job creates the Kubernetes
+  connector at install and deletes it on uninstall.
+- **Still disabled:** the Admission Controller.
 - **Broker restarts.** The broker chart puts a random `rollme` annotation on its pod template at every render, so
   the broker restarts on every Helm upgrade (a new chart version or new values), not on every Flux interval.
 
