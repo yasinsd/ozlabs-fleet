@@ -1,0 +1,23 @@
+# Switch for the Wiz integration: TARGET_WIZ_INTEGRATION = on | off (absent =
+# off). The path selects ./on (the HelmRelease) or ./off; prune removes the
+# HelmRelease when it is switched off, and Helm's uninstall runs the chart's
+# delete Job, which deletes the Kubernetes connector in the Wiz tenant. The
+# namespace, its Secrets and the HelmRepository are always on (../).
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: wiz-integration
+  namespace: flux-system
+spec:
+  interval: 1m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./platform/wiz/${TARGET_WIZ_INTEGRATION:=off}
+  prune: true
+  postBuild:
+    substituteStrategy: Always
+    substituteFrom:
+      - kind: ConfigMap
+        name: ozlabs-targets
+        optional: true

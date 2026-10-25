@@ -17,11 +17,16 @@ clusters/ozlabs-k3s/
     gotk-sync.yaml         GitRepository + Kustomization "flux-system" for this repo
     kustomization.yaml     both files + the kustomize-controller patch (below)
   kustomization.yaml       flux-system + platform.yaml + targets.yaml
-  platform.yaml            Kustomization "platform": builds ./platform (no switch, no substitution)
+  platform.yaml            Kustomization "platform": builds ./platform with the switch values
   targets.yaml             Kustomization "targets": builds ./targets with the switch values
 platform/
   kustomization.yaml       one line per platform component
-  wiz/                     namespace, HelmRepository and the Wiz HelmRelease (connector, broker and sensor on)
+  wiz/
+    namespace.yaml         namespace wiz (always on)
+    helmrepository.yaml    the Wiz chart repository (always on)
+    switch.yaml            Kustomization "wiz-integration": path ./on or ./off
+    off/                   renders nothing
+    on/                    the Wiz HelmRelease (connector, broker and sensor on)
 targets/
   kustomization.yaml       one line per target switch
   online-boutique/
@@ -45,11 +50,20 @@ VERSION                    pinned Flux version
 Git and from public Helm repositories, and applies Kustomizations and HelmReleases. Nothing listens for
 webhooks, so nothing in the cluster needs inbound access.
 
-**Platform: Wiz.** `platform/wiz/helmrelease.yaml` holds the Wiz Kubernetes integration in its full
-intended shape: connector with broker, Runtime Sensor and Admission Controller. Components are switched on one
-at a time.
-- **On:** the connector and its broker, and the Runtime Sensor (a DaemonSet). The chart's job creates the Kubernetes
-  connector at install and deletes it on uninstall.
+**Platform: Wiz.** `platform/wiz/on/helmrelease.yaml` holds the Wiz Kubernetes integration in its full
+intended shape: connector with broker, Runtime Sensor and Admission Controller. The release sits behind a
+switch, like a target; the namespace and the HelmRepository are always on.
+- **Switch:** Kustomization `wiz-integration` (`platform/wiz/switch.yaml`), key `TARGET_WIZ_INTEGRATION`, from
+  the parameter `targets/wiz-integration`. Absent means `off`. The `platform` Kustomization substitutes the key
+  into the switch's `path`, as `targets` does for a target.
+- **Switched on:** Helm installs the release, and the chart's job creates the Kubernetes connector in the Wiz
+  tenant.
+- **Switched off:** prune removes the HelmRelease. Helm's uninstall runs the chart's delete Job, which deletes
+  the Kubernetes connector in the Wiz tenant, and removes the release's workloads, the sensor DaemonSet included.
+  The namespace, its three Secrets and the HelmRepository stay, so switching it on again needs nothing new.
+
+Inside the release, components are switched on one at a time:
+- **On:** the connector and its broker, and the Runtime Sensor (a DaemonSet).
 - **Still disabled:** the Admission Controller.
 - **Broker restarts.** The broker chart puts a random `rollme` annotation on its pod template at every render, so
   the broker restarts on every Helm upgrade (a new chart version or new values), not on every Flux interval.
@@ -67,7 +81,7 @@ Its per-lab values come from in-cluster Secrets in namespace `wiz`, never from t
 | ConfigMap | `ozlabs-targets` in namespace `flux-system` |
 | Switch key | `TARGET_<NAME>` (target name in upper snake case), value `on` or `off` |
 | Sub-keys | `TARGET_<NAME>_<KEY>`, read only by that target |
-| Absent | An absent key means `off`; an absent ConfigMap means every target is off |
+| Absent | An absent key means `off`; an absent ConfigMap means every target, and the Wiz integration, is off |
 | Label | `reconcile.fluxcd.io/watch: Enabled`, so a change applies immediately, not at the next 1-minute interval |
 
 A process on the cluster host writes this ConfigMap from the host's own configuration; this repo
@@ -96,6 +110,7 @@ Current keys:
 |---|---|---|
 | `TARGET_ONLINE_BOUTIQUE` | `on` / `off` | `off` |
 | `TARGET_ONLINE_BOUTIQUE_LOADGEN_REPLICAS` | integer ≥ 0 | `1` |
+| `TARGET_WIZ_INTEGRATION` | `on` / `off` | `off` (the platform's Wiz integration, above) |
 
 Use only `on` or `off` for a switch: any other value points the target at a path that does not exist,
 and that target's Kustomization fails, without pruning anything, until the value is fixed.
@@ -127,8 +142,8 @@ kubectl apply -f https://raw.githubusercontent.com/yasinsd/ozlabs-fleet/<FLEET_C
 The first file creates the `flux-system` namespace, the CRDs and the three controllers. The `wait` lets
 the CRDs register before the second file creates the `flux-system` GitRepository and Kustomization.
 From then on, Flux reconciles `./clusters/ozlabs-k3s` from `main`, including its own manifests: the
-kustomize-controller patch is applied by that first reconcile. The cluster then runs `targets`, with
-every target off until the ConfigMap switches one on.
+kustomize-controller patch is applied by that first reconcile. The cluster then runs `platform` and
+`targets`, with the Wiz integration and every target off until the ConfigMap switches them on.
 
 ## Add a target
 
@@ -158,7 +173,7 @@ every target off until the ConfigMap switches one on.
 ## Validate
 
 ```sh
-kubectl kustomize clusters/ozlabs-k3s            # and flux-system, platform, targets, targets/*/on, targets/*/off
+kubectl kustomize clusters/ozlabs-k3s            # and flux-system, platform, platform/wiz/on, platform/wiz/off, targets, targets/*/on, targets/*/off
 
 # Render the app the way kustomize-controller does (components + patches). Substitute the
 # sub-keys first, as the switch Kustomization does in the cluster:

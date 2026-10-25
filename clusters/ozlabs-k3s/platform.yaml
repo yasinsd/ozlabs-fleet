@@ -1,8 +1,9 @@
-# Builds ./platform: always-on platform components, outside the target switches.
-# There is no switch and no substitution. Each component is pinned in Git, and a
-# component that must not run yet is suspended in its own manifest (the Wiz
-# HelmRelease, spec.suspend). No health check: a suspended release never reports
-# Ready, and the existing Kustomizations set none either.
+# Builds ./platform: the platform components. Each component is pinned in Git.
+# A switched component (the Wiz integration, platform/wiz/switch.yaml) keeps its
+# always-on parts here and puts the rest behind a switch Kustomization, like a
+# target's. Switch values come from the ozlabs-targets ConfigMap; if it is
+# absent, every switched component is off. No health check: the existing
+# Kustomizations set none either.
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
@@ -17,3 +18,9 @@ spec:
     name: flux-system
   path: ./platform
   prune: true
+  postBuild:
+    substituteStrategy: Always
+    substituteFrom:
+      - kind: ConfigMap
+        name: ozlabs-targets
+        optional: true
