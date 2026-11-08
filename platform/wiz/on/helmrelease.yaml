@@ -1,6 +1,6 @@
 # The Wiz Kubernetes integration (umbrella chart), committed in its full intended
-# shape. Components are switched on one at a time: the connector with its broker
-# and the Runtime Sensor are on; the Admission Controller is still off.
+# shape. Components are switched on one at a time: the connector with its broker,
+# the Runtime Sensor and the Admission Controller (audit mode) are on.
 #
 # Pinned: wiz-kubernetes-integration 0.3.79. The chart package bundles its
 # subcharts: wiz-kubernetes-connector 4.0.7 (wiz-broker 3.0.4),
@@ -83,10 +83,11 @@ spec:
       daemonset:
         criSocketPath: /run/k3s/containerd/containerd.sock
 
-    # Admission Controller: one replica on the single node. No cert-manager in
-    # this phase; the chart issues its own webhook certificate.
+    # Admission Controller: one replica on the single node, in audit mode. No
+    # cert-manager in this phase; the chart issues its own webhook certificate.
+    # The Kubernetes audit-log webhook stays off (the chart's default).
     wiz-admission-controller:
-      enabled: false
+      enabled: true
       replicaCount: 1
       resources:
         requests:
@@ -95,3 +96,10 @@ spec:
         limits:
           cpu: 500m
           memory: 512Mi
+      webhook:
+        # AUDIT overrides every admission policy's own action: reviews are
+        # recorded, nothing is blocked.
+        policyEnforcementMethod: AUDIT
+        # Webhook configurations as release resources, not Helm hooks, so the
+        # switch-off removes them with the release.
+        useHelmHooks: false

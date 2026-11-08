@@ -64,7 +64,8 @@ switch, like a target; the namespace and the HelmRepository are always on.
 
 Inside the release, components are switched on one at a time:
 - **On:** the connector and its broker, and the Runtime Sensor (a DaemonSet).
-- **Still disabled:** the Admission Controller.
+- **Admission Controller:** on, in audit mode (every policy audits, nothing is blocked); its Kubernetes
+  audit-log webhook is off.
 - **Broker restarts.** The broker chart puts a random `rollme` annotation on its pod template at every render, so
   the broker restarts on every Helm upgrade (a new chart version or new values), not on every Flux interval.
 
